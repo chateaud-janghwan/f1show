@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>F1 한글 뉴스 보드</title>
+<style>
+  :root {
+    --f1-red: #e10600;
+    --bg: #0f0f12;
+    --card: #1b1b21;
+    --card-hover: #23232b;
+    --text: #f2f2f4;
+    --muted: #9a9aa5;
+    --border: #2c2c35;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+      "Malgun Gothic", "Segoe UI", sans-serif;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px;
+    background: rgba(15,15,18,0.92);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .bar { width: 6px; height: 26px; background: var(--f1-red); border-radius: 2px; }
+  .brand h1 { font-size: 19px; margin: 0; font-weight: 800; letter-spacing: -0.3px; }
+  .brand small { color: var(--muted); font-weight: 500; }
+  #refresh {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--f1-red); color: #fff; border: none;
+    padding: 10px 16px; border-radius: 9px; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: filter .15s, transform .1s;
+  }
+  #refresh:hover { filter: brightness(1.1); }
+  #refresh:active { transform: scale(.96); }
+  #refresh:disabled { opacity: .6; cursor: default; }
+  #refresh svg { transition: transform .6s; }
+  #refresh.loading svg { transform: rotate(360deg); }
+
+  .meta-bar { padding: 10px 24px 0; color: var(--muted); font-size: 13px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 18px; padding: 20px 24px 48px;
+    max-width: 1280px; margin: 0 auto;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; cursor: pointer;
+    display: flex; flex-direction: column;
+    transition: transform .15s, background .15s, border-color .15s;
+  }
+  .card:hover { transform: translateY(-4px); background: var(--card-hover); border-color: #3a3a46; }
+  .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #000; display: block; }
+  .card .body { padding: 13px 14px 15px; }
+  .card .title { font-size: 15px; font-weight: 700; line-height: 1.4; margin: 0; }
+  .card .title-en { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+
+  .skeleton .thumb, .skeleton .line { background: linear-gradient(90deg,#1d1d24,#26262f,#1d1d24);
+    background-size: 200% 100%; animation: sh 1.2s infinite; }
+  .skeleton .line { height: 13px; border-radius: 5px; margin: 8px 14px; }
+  @keyframes sh { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  /* 모달 */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; max-width: 620px; width: 100%;
+    max-height: 88vh; overflow-y: auto;
+  }
+  .modal .mthumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;
+    border-radius: 16px 16px 0 0; }
+  .modal .mbody { padding: 20px 22px 24px; }
+  .modal h2 { font-size: 19px; margin: 0 0 4px; line-height: 1.4; }
+  .modal .men { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+  .summary { font-size: 15px; line-height: 1.7; white-space: pre-wrap; min-height: 60px; }
+  .summary.loading { color: var(--muted); }
+  .err { color: #ff7b7b; font-size: 14px; line-height: 1.6; }
+  .actions { display: flex; gap: 10px; margin-top: 22px; }
+  .btn {
+    flex: 1; text-align: center; text-decoration: none; padding: 12px;
+    border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; border: none;
+  }
+  .btn-go { background: var(--f1-red); color: #fff; }
+  .btn-close { background: #2c2c35; color: var(--text); }
+  .dots::after { content: ""; animation: dots 1.4s steps(4,end) infinite; }
+  @keyframes dots { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
+  .empty { text-align: center; color: var(--muted); padding: 60px 20px; grid-column: 1/-1; }
+  .more-wrap { text-align: center; padding: 0 24px 56px; }
+  #moreBtn {
+    background: #23232b; color: var(--text); border: 1px solid var(--border);
+    padding: 13px 28px; border-radius: 11px; font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  #moreBtn:hover { background: #2c2c35; border-color: #3a3a46; }
+  #moreBtn:disabled { opacity: .6; cursor: default; }
+
+  /* 모바일 (~520px) */
+  @media (max-width: 520px) {
+    header { padding: 12px 14px; }
+    .brand .bar { height: 22px; }
+    .brand h1 { font-size: 16px; }
+    .brand small { font-size: 11px; }
+    #refresh { padding: 9px 12px; font-size: 13px; }
+    .meta-bar { padding: 10px 14px 0; font-size: 12px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px; padding: 14px 14px 36px; }
+    .card .body { padding: 10px 11px 12px; }
+    .card .title { font-size: 13.5px; }
+    .card .title-en { font-size: 11px; }
+    .more-wrap { padding: 0 14px 40px; }
+    .overlay { padding: 0; align-items: flex-end; }
+    .modal { max-height: 92vh; border-radius: 16px 16px 0 0; }
+    .modal .mthumb { border-radius: 0; }
+    .modal .mbody { padding: 18px 16px 22px; }
+    .modal h2 { font-size: 17px; }
+    .summary { font-size: 14.5px; }
+    .actions { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="bar"></div>
+    <div>
+      <h1>F1 한글 뉴스 보드</h1>
+      <small>formula1.com 최신 뉴스 · 한글 요약</small>
+    </div>
+  </div>
+  <button id="refresh" onclick="loadNews(true)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    새로고침
+  </button>
+</header>
+
+<div class="meta-bar" id="metaBar"></div>
+<div class="grid" id="grid"></div>
+<div class="more-wrap" id="moreWrap" style="display:none">
+  <button id="moreBtn" onclick="loadMore()">과거 뉴스 더 보기 ↓</button>
+</div>
+
+<!-- 요약 모달 -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <img class="mthumb" id="mThumb" alt="" />
+    <div class="mbody">
+      <h2 id="mTitle"></h2>
+      <p class="men" id="mTitleEn"></p>
+      <div class="summary" id="mSummary"></div>
+      <div class="actions">
+        <a class="btn btn-go" id="mGo" target="_blank" rel="noopener">본문 바로가기 ↗</a>
+        <button class="btn btn-close" onclick="closeModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const grid = document.getElementById('grid');
+const metaBar = document.getElementById('metaBar');
+const refreshBtn = document.getElementById('refresh');
+const moreWrap = document.getElementById('moreWrap');
+const moreBtn = document.getElementById('moreBtn');
+let hasKey = true;
+let currentPage = 1;        // 마지막으로 불러온 페이지
+let totalShown = 0;         // 화면에 표시된 기사 수
+const seenUrls = new Set(); // 페이지 간 중복 제거
+
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showSkeleton(){
+  grid.innerHTML = '';
+  for(let i=0;i<8;i++){
+    grid.insertAdjacentHTML('beforeend',
+      `<div class="card skeleton"><div class="thumb"></div><div class="line" style="width:90%"></div><div class="line" style="width:60%"></div></div>`);
+  }
+}
+
+// 최신 뉴스(1페이지)를 새로 불러옴. 기존 카드 초기화.
+async function loadNews(force){
+  refreshBtn.disabled = true;
+  refreshBtn.classList.add('loading');
+  moreWrap.style.display = 'none';
+  showSkeleton();
+  metaBar.textContent = '뉴스를 불러오는 중…';
+  try{
+    const res = await fetch('/api/news?page=1' + (force ? '&refresh=1' : ''));
+    const data = await res.json();
+    if(data.error){ throw new Error(data.error); }
+    if('has_key' in data) hasKey = data.has_key;
+    // 초기화
+    grid.innerHTML = '';
+    seenUrls.clear();
+    totalShown = 0;
+    currentPage = 1;
+    appendCards(data.items);
+    if(totalShown === 0){
+      grid.innerHTML = '<div class="empty">표시할 뉴스가 없습니다.</div>';
+    }
+    const now = new Date();
+    metaBar.textContent = `${totalShown}개 기사 · 업데이트 ${now.toLocaleTimeString('ko-KR')}`
+      + (hasKey ? '' : '  ⚠️ API 키 미설정: 제목은 영어 원문으로 표시됩니다.');
+    moreWrap.style.display = totalShown ? 'block' : 'none';
+  }catch(e){
+    grid.innerHTML = `<div class="empty">불러오기 실패<br><small>${escapeHtml(e.message)}</small></div>`;
+    metaBar.textContent = '';
+  }finally{
+    refreshBtn.disabled = false;
+    refreshBtn.classList.remove('loading');
+  }
+}
+
+// 다음 페이지(과거 뉴스)를 불러와 카드 뒤에 이어 붙임.
+async function loadMore(){
+  moreBtn.disabled = true;
+  moreBtn.textContent = '불러오는 중…';
+  try{
+    const next = currentPage + 1;
+    const res = await fetch('/api/news?page=' + next);
+    const data = await res.json();
+    if(data.error){ throw new Error(data.error); }
+    const before = totalShown;
+    appendCards(data.items);
+    currentPage = next;
+    if(totalShown === before){
+      // 더 이상 새 기사가 없음 (마지막 페이지)
+      moreWrap.style.display = 'none';
+      metaBar.textContent = `${totalShown}개 기사 · 마지막 페이지입니다`;
+      return;
+    }
+    metaBar.textContent = `${totalShown}개 기사 · ${next}페이지까지 불러옴`;
+  }catch(e){
+    metaBar.textContent = '더 보기 실패: ' + e.message;
+  }finally{
+    moreBtn.disabled = false;
+    moreBtn.textContent = '과거 뉴스 더 보기 ↓';
+  }
+}
+
+function appendCards(items){
+  (items || []).forEach(it => {
+    if(seenUrls.has(it.url)) return;   // 중복 제거
+    seenUrls.add(it.url);
+    const card = document.createElement('div');
+    card.className = 'card';
+    const titleKo = it.title_ko || it.title_en || it.title;
+    const titleEn = it.title_en || it.title;
+    card.innerHTML = `
+      ${it.image ? `<img class="thumb" src="${escapeHtml(it.image)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<div class="thumb"></div>`}
+      <div class="body">
+        <p class="title">${escapeHtml(titleKo)}</p>
+        ${titleKo !== titleEn ? `<p class="title-en">${escapeHtml(titleEn)}</p>` : ''}
+      </div>`;
+    card.onclick = () => openModal(it);
+    grid.appendChild(card);
+    totalShown++;
+  });
+}
+
+const overlay = document.getElementById('overlay');
+async function openModal(it){
+  document.getElementById('mTitle').textContent = it.title_ko || it.title_en;
+  const en = it.title_en || it.title;
+  document.getElementById('mTitleEn').textContent = (it.title_ko && it.title_ko !== en) ? en : '';
+  const thumb = document.getElementById('mThumb');
+  if(it.image){ thumb.src = it.image; thumb.style.display = 'block'; }
+  else { thumb.style.display = 'none'; }
+  document.getElementById('mGo').href = it.url;
+  const sum = document.getElementById('mSummary');
+  overlay.classList.add('open');
+
+  if(!hasKey){
+    sum.className = 'summary err';
+    sum.textContent = 'API 키가 설정되지 않아 요약을 만들 수 없습니다. (관리자: Cloudflare 환경변수 GEMINI_API_KEY 확인)';
+    return;
+  }
+  sum.className = 'summary loading';
+  sum.innerHTML = '<span class="dots">본문을 요약하는 중</span>';
+  try{
+    const res = await fetch('/api/summary?url=' + encodeURIComponent(it.url));
+    const data = await res.json();
+    if(data.error){ throw new Error(data.error); }
+    sum.className = 'summary';
+    sum.textContent = data.summary;
+  }catch(e){
+    sum.className = 'summary err';
+    sum.textContent = '요약 실패: ' + e.message;
+  }
+}
+function closeModal(){ overlay.classList.remove('open'); }
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
+
+loadNews(false);
+</script>
+</body>
+</html>

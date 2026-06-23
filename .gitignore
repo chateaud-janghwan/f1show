@@ -1,0 +1,15 @@
+# 비밀 (절대 커밋 금지)
+.env
+.dev.vars
+
+# 의존성/빌드
+node_modules/
+.wrangler/
+
+# 파이썬 잔재
+venv/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store

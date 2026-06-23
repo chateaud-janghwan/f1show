@@ -1,0 +1,6 @@
+# 로컬 개발용 (wrangler pages dev) 시크릿 예시.
+# 이 파일을 복사해 ".dev.vars" 로 저장하고 키를 넣으세요. (.dev.vars 는 git 제외됨)
+
+GEMINI_API_KEY=여기에_본인_Gemini_키
+# (선택) 기본값은 gemini-2.0-flash
+GEMINI_MODEL=gemini-2.0-flash
