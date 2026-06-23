@@ -58,8 +58,18 @@ export function parseListing(html, limit = 18) {
     const d = map.get(href);
     const text = decodeEntities(stripTags(inner)).replace(/\s+/g, " ").trim();
     if (text.length > d.title.length) d.title = text;
-    const im = inner.match(/<img[^>]+src="([^"]+)"/i);
-    if (im && !d.image && !im[1].includes("w_64")) d.image = im[1];
+    if (!d.image) {
+      // 카드 이미지는 기사 링크 바깥(앞쪽 별도 span)에 있음 → 링크 앞 구간에서
+      // 가장 가까운 media 이미지를 잡는다 (w_64 드라이버 내비 썸네일 제외).
+      const start = Math.max(0, m.index - 1500);
+      const win = html.slice(start, m.index + m[0].length);
+      const imgRe = /<img\b[^>]*?\bsrc="(https:\/\/media\.formula1\.com\/[^"]+)"/gi;
+      let last = null, mm;
+      while ((mm = imgRe.exec(win)) !== null) {
+        if (!mm[1].includes("w_64")) last = mm[1];
+      }
+      if (last) d.image = last;
+    }
   }
   return order.map((u) => map.get(u)).filter((x) => x.title).slice(0, limit);
 }
