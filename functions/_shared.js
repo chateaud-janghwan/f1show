@@ -96,13 +96,50 @@ export function parseArticle(html, maxChars = 6000) {
   return { kind: "none", text: "" };
 }
 
-// Gemini 호출 (429는 잠시 대기 후 자동 재시도)
+// Groq 호출 (OpenAI 호환, 429는 잠시 대기 후 자동 재시도)
+async function groqChat(env, prompt, temperature, maxTokens) {
+  const model = env.GROQ_MODEL || "llama-3.3-70b-versatile";
+  const body = JSON.stringify({
+    model,
+    messages: [{ role: "user", content: prompt }],
+    temperature,
+    max_tokens: maxTokens,
+  });
+  const waits = [3000, 12000];
+  for (let attempt = 0; attempt <= waits.length; attempt++) {
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+    if (r.status === 200) {
+      const d = await r.json();
+      return (d?.choices?.[0]?.message?.content || "").trim();
+    }
+    if (r.status === 429 && attempt < waits.length) {
+      await new Promise((s) => setTimeout(s, waits[attempt]));
+      continue;
+    }
+    const t = await r.text();
+    throw new Error(`Groq API 오류 ${r.status}: ${t.slice(0, 200)}`);
+  }
+}
+
+// LLM 호출 — GROQ_API_KEY 있으면 Groq 우선, 없으면 Gemini (429는 재시도)
 export async function geminiChat(env, prompt, opts = {}) {
+  const temperature = opts.temperature ?? 0.3;
+  const maxTokens = opts.maxTokens ?? 700;
+
+  if (env.GROQ_API_KEY) {
+    return groqChat(env, prompt, temperature, maxTokens);
+  }
+
   const key = env.GEMINI_API_KEY;
   if (!key) throw new Error("NO_API_KEY");
   const model = env.GEMINI_MODEL || "gemini-2.0-flash";
-  const temperature = opts.temperature ?? 0.3;
-  const maxTokens = opts.maxTokens ?? 700;
 
   const gen = { temperature, maxOutputTokens: maxTokens };
   if (model.includes("2.5")) gen.thinkingConfig = { thinkingBudget: 0 };

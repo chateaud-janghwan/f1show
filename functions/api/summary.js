@@ -6,7 +6,7 @@ export async function onRequestGet({ request, env }) {
   if (!target.startsWith("https://www.formula1.com/")) {
     return json({ error: "잘못된 URL" }, 400);
   }
-  if (!env.GEMINI_API_KEY) {
+  if (!env.GROQ_API_KEY && !env.GEMINI_API_KEY) {
     return json({ error: "API 키가 설정되지 않았습니다. Cloudflare 환경변수를 확인하세요." }, 400);
   }
 

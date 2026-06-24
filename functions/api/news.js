@@ -11,7 +11,7 @@ export async function onRequestGet({ request, env }) {
     const html = await fetchHtml(target);
     const items = parseListing(html, 18);
 
-    if (env.GEMINI_API_KEY && items.length) {
+    if ((env.GROQ_API_KEY || env.GEMINI_API_KEY) && items.length) {
       try {
         const numbered = items.map((it, i) => `${i + 1}. ${it.title}`).join("\n");
         const prompt =
@@ -41,7 +41,7 @@ export async function onRequestGet({ request, env }) {
       });
     }
 
-    return json({ items, page, has_key: !!env.GEMINI_API_KEY });
+    return json({ items, page, has_key: !!(env.GROQ_API_KEY || env.GEMINI_API_KEY) });
   } catch (e) {
     return json({ error: "크롤링 실패: " + e.message }, 502);
   }
